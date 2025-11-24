@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Layout, Card, Select, Table, Typography, Progress, Tag, Banner } from '@douyinfe/semi-ui';
+import { Card, Select, Table, Typography, Progress, Tag, Banner, Input, Form, Button } from '@douyinfe/semi-ui';
 import { API, showError } from '../../helpers';
 import { useTranslation } from 'react-i18next';
+import { IconSearch, IconRefresh } from '@douyinfe/semi-icons';
 
-const { Header, Content } = Layout;
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 const RateLimit = () => {
   const { t } = useTranslation();
@@ -13,19 +13,17 @@ const RateLimit = () => {
   const [monitorData, setMonitorData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [monitorLoading, setMonitorLoading] = useState(false);
+  
+  // 筛选状态
+  const [filterModel, setFilterModel] = useState('');
 
   const loadChannels = async () => {
     setLoading(true);
     try {
-      // 获取前100个渠道
       const res = await API.get('/api/channel?p=0&size=100');
       const { success, message, data } = res.data;
       if (success) {
         setChannels(data.items);
-        if (data.items.length > 0) {
-             // 可选：默认选中第一个
-             // setSelectedChannelId(data.items[0].id);
-        }
       } else {
         showError(message);
       }
@@ -116,58 +114,74 @@ const RateLimit = () => {
     },
   ];
 
+  // 前端过滤数据
+  const filteredData = monitorData.filter(item => {
+    if (!filterModel) return true;
+    return item.model_name.toLowerCase().includes(filterModel.toLowerCase());
+  });
+
   return (
-    <>
-      <Layout>
-        <Header>
-          <Title heading={3}>{t('速率限制监控')}</Title>
-        </Header>
-        <Content>
-            <Banner 
-                fullMode={false}
-                type="info"
-                icon={null}
-                closeIcon={null}
-                title={t('关于速率限制')}
-                description={t('此处展示各渠道模型的实时速率限制状态。数据直接来自 Redis 缓存，可能存在轻微延迟。')}
-                style={{ marginBottom: 20 }}
+    <div className='mt-[60px] px-2'>
+      <Banner 
+        fullMode={false}
+        type="info"
+        icon={null}
+        closeIcon={null}
+        title={t('速率限制管理')}
+        description={t('此处为各渠道模型的实时速率限制状态。数据直接来自 Redis 缓存，可能存在轻微延迟。')}
+        style={{ marginBottom: 20 }}
+      />
+      
+      <Card>
+        <Form layout='horizontal' style={{ marginBottom: 20 }}>
+            <Form.Select
+                label={t('渠道')}
+                style={{ width: 250 }}
+                filter
+                placeholder={t('搜索并选择渠道...')}
+                optionList={channels.map(c => ({ value: c.id, label: `${c.id} - ${c.name} (${c.type === 1 ? 'OpenAI' : 'Other'})` }))}
+                onChange={value => setSelectedChannelId(value)}
+                loading={loading}
             />
-            <Card>
-                <div style={{ marginBottom: 20, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
-                    <Text strong style={{ fontSize: 16 }}>{t('选择监控渠道')}:</Text>
-                    <Select
-                        style={{ width: 320 }}
-                        filter
-                        placeholder={t('搜索并选择渠道...')}
-                        optionList={channels.map(c => ({ value: c.id, label: `${c.id} - ${c.name} (${c.type === 1 ? 'OpenAI' : 'Other'})` }))}
-                        onChange={value => setSelectedChannelId(value)}
-                        loading={loading}
-                    />
-                    {selectedChannelId && (
-                        <Tag 
-                            color='blue' 
-                            type='solid' 
-                            style={{ cursor: 'pointer' }}
-                            onClick={() => loadMonitorData(selectedChannelId)}
-                        >
-                            {t('刷新数据')}
-                        </Tag>
-                    )}
-                </div>
-                
-                <Table
-                    columns={columns}
-                    dataSource={monitorData}
-                    loading={monitorLoading}
-                    pagination={{ pageSize: 20, showSizeChanger: true }}
-                    emptyText={selectedChannelId ? t('该渠道暂无模型限制数据或未配置模型') : t('请先选择一个渠道以查看数据')}
-                />
-            </Card>
-        </Content>
-      </Layout>
-    </>
+            <Form.Input
+                field="model"
+                label={t('模型名称')}
+                placeholder={t('搜索模型...')}
+                style={{ width: 200 }}
+                value={filterModel}
+                onChange={value => setFilterModel(value)}
+                prefix={<IconSearch />}
+            />
+             <Form.DatePicker
+                label={t('时间范围')}
+                type="dateTimeRange"
+                placeholder={t('选择时间范围')}
+                style={{ width: 320 }}
+                disabled
+                extraText={t('实时监控数据不支持时间筛选')}
+            />
+            <Button 
+                icon={<IconRefresh />} 
+                theme='solid' 
+                type='primary'
+                style={{ marginLeft: 10 }} 
+                onClick={() => selectedChannelId && loadMonitorData(selectedChannelId)}
+                disabled={!selectedChannelId}
+            >
+                {t('刷新')}
+            </Button>
+        </Form>
+        
+        <Table
+            columns={columns}
+            dataSource={filteredData}
+            loading={monitorLoading}
+            pagination={{ pageSize: 20, showSizeChanger: true }}
+            emptyText={selectedChannelId ? (filteredData.length === 0 && filterModel ? t('未找到匹配的模型') : t('该渠道暂无模型限制数据或未配置模型')) : t('请先选择一个渠道以查看数据')}
+        />
+      </Card>
+    </div>
   );
 };
 
 export default RateLimit;
-

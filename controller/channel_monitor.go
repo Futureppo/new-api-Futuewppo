@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"context"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -41,9 +39,6 @@ func GetChannelMonitorData(c *gin.Context) {
 	models := channel.GetModels()
 	data := make([]ChannelMonitorData, 0)
 
-	ctx := context.Background()
-	rdb := common.RDB
-
 	for _, modelName := range models {
 		modelName = strings.TrimSpace(modelName)
 		if modelName == "" {
@@ -60,23 +55,8 @@ func GetChannelMonitorData(c *gin.Context) {
 			rpd = limit.RPD
 		}
 
-		// Get current usage from Redis
-		var currentRPM, currentTPM, currentRPD int64
-		if common.RedisEnabled {
-			// RPM
-			rpmKey := fmt.Sprintf("%s%d:%s", service.ChannelRPMPrefix, channel.Id, modelName)
-			currentRPM, _ = rdb.LLen(ctx, rpmKey).Result()
-
-			// TPM
-			tpmKey := fmt.Sprintf("%s%d:%s", service.ChannelTPMPrefix, channel.Id, modelName)
-			currentTPMVal, _ := rdb.Get(ctx, tpmKey).Int64()
-			currentTPM = currentTPMVal
-
-			// RPD
-			rpdKey := fmt.Sprintf("%s%d:%s", service.ChannelRPDPrefix, channel.Id, modelName)
-			currentRPDVal, _ := rdb.Get(ctx, rpdKey).Int64()
-			currentRPD = currentRPDVal
-		}
+		// Get current usage
+		currentRPM, currentTPM, currentRPD := service.GetChannelRateLimitUsage(channel.Id, modelName)
 
 		data = append(data, ChannelMonitorData{
 			ModelName:  modelName,
