@@ -134,42 +134,45 @@ const RateLimit = () => {
       
       <Card>
         <Form layout='horizontal' style={{ marginBottom: 20 }}>
-            <Form.Select
-                label={t('渠道')}
-                style={{ width: 250 }}
-                filter
-                placeholder={t('搜索并选择渠道...')}
-                optionList={channels.map(c => ({ value: c.id, label: `${c.id} - ${c.name} (${c.type === 1 ? 'OpenAI' : 'Other'})` }))}
-                onChange={value => setSelectedChannelId(value)}
-                loading={loading}
-            />
-            <Form.Input
-                field="model"
-                label={t('模型名称')}
-                placeholder={t('搜索模型...')}
-                style={{ width: 200 }}
-                value={filterModel}
-                onChange={value => setFilterModel(value)}
-                prefix={<IconSearch />}
-            />
-             <Form.DatePicker
-                label={t('时间范围')}
-                type="dateTimeRange"
-                placeholder={t('选择时间范围')}
-                style={{ width: 320 }}
-                disabled
-                extraText={t('实时监控数据不支持时间筛选')}
-            />
-            <Button 
-                icon={<IconRefresh />} 
-                theme='solid' 
-                type='primary'
-                style={{ marginLeft: 10 }} 
-                onClick={() => selectedChannelId && loadMonitorData(selectedChannelId)}
-                disabled={!selectedChannelId}
-            >
-                {t('刷新')}
-            </Button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                    <Form.Select
+                        label={t('渠道')}
+                        style={{ width: 250 }}
+                        filter
+                        placeholder={t('搜索并选择渠道...')}
+                        optionList={channels.map(c => ({ value: c.id, label: `${c.id} - ${c.name} (${c.type === 1 ? 'OpenAI' : 'Other'})` }))}
+                        onChange={value => setSelectedChannelId(value)}
+                        loading={loading}
+                    />
+                    <Form.Input
+                        field="model"
+                        label={t('模型名称')}
+                        placeholder={t('搜索模型...')}
+                        style={{ width: 200 }}
+                        value={filterModel}
+                        onChange={value => setFilterModel(value)}
+                        prefix={<IconSearch />}
+                    />
+                    <Form.DatePicker
+                        label={t('时间范围')}
+                        type="dateTimeRange"
+                        placeholder={t('选择时间范围')}
+                        style={{ width: 320 }}
+                        disabled
+                        extraText={t('实时监控数据不支持时间筛选')}
+                    />
+                </div>
+                <Button 
+                    icon={<IconRefresh />} 
+                    theme='solid' 
+                    type='primary'
+                    onClick={() => selectedChannelId && loadMonitorData(selectedChannelId)}
+                    disabled={!selectedChannelId}
+                >
+                    {t('刷新')}
+                </Button>
+            </div>
         </Form>
         
         <Table
