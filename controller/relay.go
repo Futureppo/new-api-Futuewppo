@@ -168,7 +168,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		// 1. Check Channel-wide limits (sum of all models)
 		if err := service.CheckChannelRateLimit(channel.Id, "", channel.GetRateLimitRPM(), channel.GetRateLimitTPM(), channel.GetRateLimitRPD()); err != nil {
 			logger.LogError(c, fmt.Sprintf("Channel %d (Global) rate limited: %s", channel.Id, err.Error()))
-			newAPIError = types.NewError(err, types.ErrorCodeChannelRateLimited)
+			newAPIError = types.NewErrorWithStatusCode(err, types.ErrorCodeChannelRateLimited, http.StatusTooManyRequests, types.ErrOptionWithSkipRetry())
 			continue
 		}
 
@@ -177,7 +177,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if limit, ok := rateLimitSettings[relayInfo.OriginModelName]; ok {
 			if err := service.CheckChannelRateLimit(channel.Id, relayInfo.OriginModelName, limit.RPM, limit.TPM, limit.RPD); err != nil {
 				logger.LogError(c, fmt.Sprintf("Channel %d model %s rate limited: %s", channel.Id, relayInfo.OriginModelName, err.Error()))
-				newAPIError = types.NewError(err, types.ErrorCodeChannelRateLimited)
+				newAPIError = types.NewErrorWithStatusCode(err, types.ErrorCodeChannelRateLimited, http.StatusTooManyRequests, types.ErrOptionWithSkipRetry())
 				continue
 			}
 		}

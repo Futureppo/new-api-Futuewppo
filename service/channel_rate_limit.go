@@ -65,7 +65,7 @@ func checkChannelRateLimitRedis(channelId int, modelName string, rpm, tpm, rpd i
 			if err == nil {
 				now := time.Now().Unix()
 				if now-oldTimeVal < 60 {
-					return fmt.Errorf("model %s RPM limit exceeded", modelName)
+					return fmt.Errorf("当前渠道模型负载已饱和")
 				}
 			}
 		}
@@ -76,7 +76,7 @@ func checkChannelRateLimitRedis(channelId int, modelName string, rpm, tpm, rpd i
 		key := fmt.Sprintf("%s%d:%s", ChannelRPDPrefix, channelId, modelName)
 		val, err := rdb.Get(ctx, key).Int64()
 		if err == nil && val >= int64(rpd) {
-			return fmt.Errorf("model %s RPD limit exceeded", modelName)
+			return fmt.Errorf("当前渠道模型负载已饱和")
 		}
 	}
 
@@ -85,7 +85,7 @@ func checkChannelRateLimitRedis(channelId int, modelName string, rpm, tpm, rpd i
 		key := fmt.Sprintf("%s%d:%s", ChannelTPMPrefix, channelId, modelName)
 		val, err := rdb.Get(ctx, key).Int64()
 		if err == nil && val >= int64(tpm) {
-			return fmt.Errorf("model %s TPM limit exceeded", modelName)
+			return fmt.Errorf("当前渠道模型负载已饱和")
 		}
 	}
 	return nil
@@ -161,7 +161,7 @@ func checkChannelRateLimitMemory(channelId int, modelName string, rpm, tpm, rpd 
 				}
 			}
 			if count >= rpm {
-				return fmt.Errorf("model %s RPM limit exceeded", modelName)
+				return fmt.Errorf("当前渠道模型负载已饱和")
 			}
 		}
 	}
@@ -170,7 +170,7 @@ func checkChannelRateLimitMemory(channelId int, modelName string, rpm, tpm, rpd 
 	if tpm > 0 {
 		if item, ok := memoryTPMStore[key]; ok {
 			if now < item.Expiration && item.Count >= int64(tpm) {
-				return fmt.Errorf("model %s TPM limit exceeded", modelName)
+				return fmt.Errorf("当前渠道模型负载已饱和")
 			}
 		}
 	}
@@ -179,7 +179,7 @@ func checkChannelRateLimitMemory(channelId int, modelName string, rpm, tpm, rpd 
 	if rpd > 0 {
 		if item, ok := memoryRPDStore[key]; ok {
 			if now < item.Expiration && item.Count >= int64(rpd) {
-				return fmt.Errorf("model %s RPD limit exceeded", modelName)
+				return fmt.Errorf("当前渠道模型负载已饱和")
 			}
 		}
 	}
