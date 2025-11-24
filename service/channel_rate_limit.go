@@ -96,28 +96,29 @@ func recordChannelRateLimitRedis(channelId int, modelName string, rpm, tpm, rpd 
 	rdb := common.RDB
 
 	// RPM Record
-	if rpm > 0 {
-		key := fmt.Sprintf("%s%d:%s", ChannelRPMPrefix, channelId, modelName)
-		rdb.LPush(ctx, key, time.Now().Unix())
-		rdb.LTrim(ctx, key, 0, int64(rpm-1))
-		rdb.Expire(ctx, key, time.Minute)
+	// Even if rpm limit is 0 (unlimited), we record up to a default limit for monitoring purposes
+	limitRPM := int64(rpm)
+	if limitRPM <= 0 {
+		limitRPM = 1000 // Default monitoring window size
 	}
+	keyRPM := fmt.Sprintf("%s%d:%s", ChannelRPMPrefix, channelId, modelName)
+	rdb.LPush(ctx, keyRPM, time.Now().Unix())
+	rdb.LTrim(ctx, keyRPM, 0, limitRPM-1)
+	rdb.Expire(ctx, keyRPM, time.Minute)
 
 	// RPD Record
-	if rpd > 0 {
-		key := fmt.Sprintf("%s%d:%s", ChannelRPDPrefix, channelId, modelName)
-		val, _ := rdb.Incr(ctx, key).Result()
-		if val == 1 {
-			rdb.Expire(ctx, key, 24*time.Hour)
-		}
+	keyRPD := fmt.Sprintf("%s%d:%s", ChannelRPDPrefix, channelId, modelName)
+	val, _ := rdb.Incr(ctx, keyRPD).Result()
+	if val == 1 {
+		rdb.Expire(ctx, keyRPD, 24*time.Hour)
 	}
 
 	// TPM Record
-	if tpm > 0 && tokens > 0 {
-		key := fmt.Sprintf("%s%d:%s", ChannelTPMPrefix, channelId, modelName)
-		val, _ := rdb.IncrBy(ctx, key, int64(tokens)).Result()
+	if tokens > 0 {
+		keyTPM := fmt.Sprintf("%s%d:%s", ChannelTPMPrefix, channelId, modelName)
+		val, _ := rdb.IncrBy(ctx, keyTPM, int64(tokens)).Result()
 		if val == int64(tokens) {
-			rdb.Expire(ctx, key, time.Minute)
+			rdb.Expire(ctx, keyTPM, time.Minute)
 		}
 	}
 }
@@ -194,21 +195,27 @@ func recordChannelRateLimitMemory(channelId int, modelName string, rpm, tpm, rpd
 	defer memoryMutex.Unlock()
 
 	// RPM Record
-	if rpm > 0 {
-		timestamps := memoryRPMStore[key]
-		// Cleanup expired
-		newTimestamps := make([]int64, 0, len(timestamps)+1)
-		for _, ts := range timestamps {
-			if now-ts < 60 {
-				newTimestamps = append(newTimestamps, ts)
-			}
+	timestamps := memoryRPMStore[key]
+	// Cleanup expired
+	newTimestamps := make([]int64, 0, len(timestamps)+1)
+	for _, ts := range timestamps {
+		if now-ts < 60 {
+			newTimestamps = append(newTimestamps, ts)
 		}
-		newTimestamps = append(newTimestamps, now)
-		memoryRPMStore[key] = newTimestamps
 	}
+	newTimestamps = append(newTimestamps, now)
+	// Trim if needed (monitor safety cap)
+	limitRPM := rpm
+	if limitRPM <= 0 {
+		limitRPM = 1000
+	}
+	if len(newTimestamps) > limitRPM {
+		newTimestamps = newTimestamps[len(newTimestamps)-limitRPM:]
+	}
+	memoryRPMStore[key] = newTimestamps
 
 	// TPM Record
-	if tpm > 0 && tokens > 0 {
+	if tokens > 0 {
 		item, ok := memoryTPMStore[key]
 		if !ok || now >= item.Expiration {
 			item = &MemoryCountItem{Count: int64(tokens), Expiration: now + 60}
@@ -219,15 +226,13 @@ func recordChannelRateLimitMemory(channelId int, modelName string, rpm, tpm, rpd
 	}
 
 	// RPD Record
-	if rpd > 0 {
-		item, ok := memoryRPDStore[key]
-		if !ok || now >= item.Expiration {
-			item = &MemoryCountItem{Count: 1, Expiration: now + 24*3600}
-		} else {
-			item.Count++
-		}
-		memoryRPDStore[key] = item
+	item, ok := memoryRPDStore[key]
+	if !ok || now >= item.Expiration {
+		item = &MemoryCountItem{Count: 1, Expiration: now + 24*3600}
+	} else {
+		item.Count++
 	}
+	memoryRPDStore[key] = item
 }
 
 func getChannelRateLimitUsageMemory(channelId int, modelName string) (rpm, tpm, rpd int64) {
