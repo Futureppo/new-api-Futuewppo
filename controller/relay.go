@@ -169,7 +169,20 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		if err := service.CheckChannelRateLimit(channel.Id, "", channel.GetRateLimitRPM(), channel.GetRateLimitTPM(), channel.GetRateLimitRPD()); err != nil {
 			logger.LogError(c, fmt.Sprintf("Channel %d (Global) rate limited: %s", channel.Id, err.Error()))
 			newAPIError = types.NewErrorWithStatusCode(err, types.ErrorCodeChannelRateLimited, http.StatusTooManyRequests, types.ErrOptionWithSkipRetry())
-			continue
+
+			// Disable channel asynchronously when rate limit is exceeded
+			channelError := types.ChannelError{
+				ChannelId:   channel.Id,
+				ChannelName: channel.Name,
+				ChannelType: channel.Type,
+				IsMultiKey:  channel.ChannelInfo.IsMultiKey,
+				UsingKey:    common.GetContextKeyString(c, constant.ContextKeyChannelKey),
+				AutoBan:     channel.GetAutoBan(),
+			}
+			gopool.Go(func() {
+				service.DisableChannel(channelError, fmt.Sprintf("渠道速率限制已达上限：%s", err.Error()))
+			})
+			break
 		}
 
 		// 2. Check Model-specific limits
@@ -178,7 +191,20 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			if err := service.CheckChannelRateLimit(channel.Id, relayInfo.OriginModelName, limit.RPM, limit.TPM, limit.RPD); err != nil {
 				logger.LogError(c, fmt.Sprintf("Channel %d model %s rate limited: %s", channel.Id, relayInfo.OriginModelName, err.Error()))
 				newAPIError = types.NewErrorWithStatusCode(err, types.ErrorCodeChannelRateLimited, http.StatusTooManyRequests, types.ErrOptionWithSkipRetry())
-				continue
+
+				// Disable channel asynchronously when rate limit is exceeded
+				channelError := types.ChannelError{
+					ChannelId:   channel.Id,
+					ChannelName: channel.Name,
+					ChannelType: channel.Type,
+					IsMultiKey:  channel.ChannelInfo.IsMultiKey,
+					UsingKey:    common.GetContextKeyString(c, constant.ContextKeyChannelKey),
+					AutoBan:     channel.GetAutoBan(),
+				}
+				gopool.Go(func() {
+					service.DisableChannel(channelError, fmt.Sprintf("模型 %s 速率限制已达上限：%s", relayInfo.OriginModelName, err.Error()))
+				})
+				break
 			}
 		}
 
